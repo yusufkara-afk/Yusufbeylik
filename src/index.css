@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: #0B1120;
+  color: #F1F5F9;
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary-cyan text-primary-bg font-semibold py-3 px-4 rounded-lg hover:opacity-90 transition-opacity w-full;
+  }
+
+  .input-field {
+    @apply w-full bg-primary-card border border-gray-700 rounded-lg px-4 py-3 text-primary-text placeholder-primary-muted focus:outline-none focus:border-primary-accent transition-colors;
+  }
+
+  .card {
+    @apply bg-primary-card rounded-lg p-6;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0B1120;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1A2332;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #2a3544;
+}
