@@ -1764,7 +1764,6 @@ function ProductDetailPage({
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
-  const [initializing, setInitializing] = useState(true);
   const [view, setView] = useState<View>('dashboard');
   const [profile, setProfile] = useState<Profile | null>(null);
   const [trendyolStatus, setTrendyolStatus] = useState<TrendyolStatus | null>(null);
@@ -1779,27 +1778,50 @@ function App() {
 
   const [selectedProductBarcode, setSelectedProductBarcode] = useState<string | null>(null);
 
+  // Non-blocking session check - runs in background, UI renders immediately
   useEffect(() => {
     // Check if we're on the early access page
     if (window.location.pathname === '/erken-erisim') {
       setIsEarlyAccessPage(true);
-      setInitializing(false);
       return;
     }
 
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setInitializing(false);
-    }).catch((error) => {
-      console.error('Failed to get session:', error);
-      setInitializing(false);
-    });
+    let mounted = true;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-    });
+    // Try to get session in background - never blocks UI
+    supabase.auth.getSession()
+      .then(({ data }) => {
+        if (mounted && data?.session) {
+          setSession(data.session);
+        }
+      })
+      .catch(() => {
+        // Session check failed - continue as guest (no session)
+      });
 
-    return () => subscription.unsubscribe();
+    // Set up auth state listener - wrap in try/catch for safety
+    let subscription: { unsubscribe: () => void } | null = null;
+    try {
+      const { data: { subscription: sub } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+        if (mounted) {
+          setSession(newSession);
+        }
+      });
+      subscription = sub;
+    } catch {
+      // Auth state listener failed - continue without it
+    }
+
+    return () => {
+      mounted = false;
+      if (subscription) {
+        try {
+          subscription.unsubscribe();
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
+    };
   }, []);
 
   const fetchProfile = useCallback(async (userId: string, userEmail?: string) => {
@@ -1882,14 +1904,7 @@ function App() {
     ? productStats.find((p) => p.product_barcode === selectedProductBarcode)?.product_name || null
     : null;
 
-  if (initializing) {
-    return (
-      <div className="min-h-screen bg-primary-bg flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-primary-cyan animate-spin" />
-      </div>
-    );
-  }
-
+  // Render immediately - session loads in background
   if (isEarlyAccessPage) {
     const handleEarlyAccessSignup = () => {
       window.location.href = '/';

@@ -1,13 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string) || '';
+const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || '';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase environment variables. Please check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
-}
-
-export const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseAnonKey || 'placeholder-key');
+export const supabase = createClient(
+  supabaseUrl || 'https://ytguuqnefjkwyirjmbks.supabase.co',
+  supabaseAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0Z3V1cW5lZmprd3lpcmptYmtzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MTE5NDYsImV4cCI6MjA5NzI4Nzk0Nn0.0vBOVpcECeo92GtHM4Lh1MmROgbUBGGwQDapdKPYbRI'
+);
 
 export type ProductStatus = 'stop' | 'watch' | 'go';
 
