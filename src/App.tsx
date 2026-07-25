@@ -189,19 +189,109 @@ async function disconnectTrendyol(): Promise<void> {
 async function createPaymentLink(
   plan: 'monthly' | 'yearly'
 ): Promise<{ success: boolean; payment_url?: string; error?: string }> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return { success: false, error: 'Oturum bulunamadı' };
+  // 1. Session kontrolü
+  let session;
+  try {
+    const sessionResult = await supabase.auth.getSession();
+    if (sessionResult.error) {
+      console.error('[createPaymentLink] getSession error:', sessionResult.error);
+      return { success: false, error: `Oturum bilgisi alınamadı: ${sessionResult.error.message}` };
+    }
+    session = sessionResult.data.session;
+  } catch (err) {
+    console.error('[createPaymentLink] getSession threw:', err);
+    return { success: false, error: 'Oturum bilgisi alınırken beklenmeyen bir hata oluştu' };
+  }
 
-  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/paytr-payment`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${session.access_token}`,
-    },
-    body: JSON.stringify({ plan }),
-  });
+  if (!session) {
+    return { success: false, error: 'Oturum bulunamadı, lütfen tekrar giriş yapın' };
+  }
 
-  return response.json();
+  // 2. Supabase URL'sinin build-time'da tanımlı olduğunu doğrula
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  if (!supabaseUrl) {
+    console.error('[createPaymentLink] VITE_SUPABASE_URL is not defined at build time');
+    return {
+      success: false,
+      error: 'Yapılandırma hatası: VITE_SUPABASE_URL tanımlı değil (deployment ortam değişkenlerini kontrol edin)',
+    };
+  }
+
+  const functionUrl = `${supabaseUrl}/functions/v1/paytr-payment`;
+
+  // 3. Fetch isteği — ağ hatası, CORS hatası burada yakalanır
+  let response: Response;
+  try {
+    response = await fetch(functionUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ plan }),
+    });
+  } catch (err) {
+    console.error('[createPaymentLink] fetch threw (network/CORS):', err, 'URL:', functionUrl);
+    return {
+      success: false,
+      error: `Sunucuya ulaşılamadı (ağ/CORS hatası). URL: ${functionUrl} — Edge Function deploy edilmiş mi kontrol edin.`,
+    };
+  }
+
+  // 4. Ham response body'yi önce text olarak oku (JSON parse patlamasın diye)
+  let rawText: string;
+  try {
+    rawText = await response.text();
+  } catch (err) {
+    console.error('[createPaymentLink] response.text() threw:', err);
+    return { success: false, error: 'Sunucu yanıtı okunamadı' };
+  }
+
+  // 5. HTML dönüyorsa (yanlış URL / 404 sayfası / SPA fallback) net şekilde yakala
+  const looksLikeHtml = rawText.trim().startsWith('<');
+  if (looksLikeHtml) {
+    console.error(
+      '[createPaymentLink] Response is HTML, not JSON. Status:', response.status,
+      'URL:', functionUrl,
+      'Body (first 300 chars):', rawText.slice(0, 300)
+    );
+    return {
+      success: false,
+      error: `Sunucu JSON yerine HTML döndürdü (status ${response.status}). Bu genelde Edge Function'ın bu URL'de deploy edilmediği anlamına gelir: ${functionUrl}`,
+    };
+  }
+
+  // 6. JSON parse
+  let data: { success?: boolean; payment_url?: string; error?: string };
+  try {
+    data = JSON.parse(rawText);
+  } catch (err) {
+    console.error('[createPaymentLink] JSON.parse failed. Status:', response.status, 'Body:', rawText.slice(0, 300));
+    return {
+      success: false,
+      error: `Sunucu yanıtı geçerli JSON değil (status ${response.status}): ${rawText.slice(0, 150)}`,
+    };
+  }
+
+  // 7. HTTP status başarısızsa (400/401/404/500 vb.) ama JSON parse edilebildiyse
+  if (!response.ok) {
+    console.error('[createPaymentLink] Non-OK response:', response.status, data);
+    return {
+      success: false,
+      error: data.error || `Sunucu hatası (status ${response.status})`,
+    };
+  }
+
+  // 8. Başarılı ama beklenen alan eksikse
+  if (!data.success || !data.payment_url) {
+    console.error('[createPaymentLink] Response missing success/payment_url:', data);
+    return {
+      success: false,
+      error: data.error || 'Ödeme linki sunucudan alınamadı (payment_url eksik)',
+    };
+  }
+
+  return { success: true, payment_url: data.payment_url };
 }
 
 // ─── Auth Page ─────────────────────────────────────────────────────────────
@@ -1395,35 +1485,71 @@ function SettingsPage({
     setProcessingPayment(true);
     setError('');
 
-    // Ensure profile exists before creating payment
-    if (!profile) {
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .maybeSingle();
+    try {
+      // Ensure profile exists before creating payment
+      if (!profile) {
+        try {
+          const { data: existingProfile, error: fetchProfileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
 
-      if (!existingProfile) {
-        const { data: newProfile } = await supabase
-          .from('profiles')
-          .insert({ user_id: session.user.id, email: session.user.email })
-          .select()
-          .single();
-        if (newProfile) onProfileUpdate();
-      } else {
-        onProfileUpdate();
+          if (fetchProfileError) {
+            console.error('[handleSubscribe] profile fetch error:', fetchProfileError);
+            setError(`Profil bilgisi alınamadı: ${fetchProfileError.message}`);
+            return;
+          }
+
+          if (!existingProfile) {
+            const { data: newProfile, error: insertProfileError } = await supabase
+              .from('profiles')
+              .insert({ user_id: session.user.id, email: session.user.email })
+              .select()
+              .single();
+
+            if (insertProfileError) {
+              console.error('[handleSubscribe] profile insert error:', insertProfileError);
+              setError(`Profil oluşturulamadı: ${insertProfileError.message}`);
+              return;
+            }
+
+            if (newProfile) onProfileUpdate();
+          } else {
+            onProfileUpdate();
+          }
+        } catch (profileErr) {
+          console.error('[handleSubscribe] unexpected profile error:', profileErr);
+          const message = profileErr instanceof Error ? profileErr.message : 'Bilinmeyen hata';
+          setError(`Profil kontrolü sırasında beklenmeyen hata: ${message}`);
+          return;
+        }
       }
+
+      // Ödeme linki oluştur
+      const result = await createPaymentLink(selectedPlan);
+
+      if (result.success && result.payment_url) {
+        const newTab = window.open(result.payment_url, '_blank');
+        if (!newTab) {
+          // Popup engellendiyse kullanıcıyı bilgilendir, aynı sekmede yönlendir
+          console.warn('[handleSubscribe] window.open blocked by popup blocker, falling back to same-tab redirect');
+          window.location.href = result.payment_url;
+        }
+      } else {
+        console.error('[handleSubscribe] createPaymentLink failed:', result.error);
+        setError(result.error || 'Ödeme linki oluşturulamadı (bilinmeyen hata)');
+      }
+    } catch (err) {
+      // Buraya normalde hiç düşülmemeli çünkü createPaymentLink kendi içinde
+      // her şeyi yakalıyor — ama beklenmedik bir durum için son güvenlik ağı.
+      console.error('[handleSubscribe] unexpected top-level error:', err);
+      const message = err instanceof Error ? err.message : 'Bilinmeyen hata';
+      setError(`Beklenmeyen hata: ${message}`);
+    } finally {
+      // Ne olursa olsun spinner durur — hata olsun olmasın.
+      setProcessingPayment(false);
     }
-
-    const result = await createPaymentLink(selectedPlan);
-
-    if (result.success && result.payment_url) {
-      window.open(result.payment_url, '_blank');
-    } else {
-      setError(result.error || 'Ödeme linki oluşturulamadı');
-    }
-
-    setProcessingPayment(false);
   };
 
   return (
