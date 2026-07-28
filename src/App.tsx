@@ -592,7 +592,7 @@ import {
   Zap,
   Lightbulb,
   LinkIcon,
-} from 'lucide-react';
+ from 'lucide-react';
 import { supabase } from './lib/supabase';
 import type { Profile, Claim, ClaimReasonSummary, ProductClaimStats } from './lib/supabase';
 
