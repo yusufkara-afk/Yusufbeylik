@@ -561,4 +561,58 @@ function Layout({
                         <span className="text-sm text-primary-muted">Hesap Durumu</span>
                         <span className="text-status-go text-sm flex items-center gap-1">
                           <CheckCircle className="w-4 h-4" /> Aktif
-            
+                                                  </span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleSignOut}
+                      className="w-full text-left px-4 py-3 text-sm text-status-stop hover:bg-status-stop/10 transition-colors border-t border-gray-700"
+                    >
+                      Çıkış Yap
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 p-4 lg:p-6 overflow-y-auto">
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+export default function Root() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [view, setView] = useState<View>('dashboard');
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (!session) {
+    return <AuthPage />;
+  }
+
+  return (
+    <Layout session={session} view={view} setView={setView}>
+      <div className="card">
+        <h2 className="text-xl font-bold mb-4">Dashboard</h2>
+        <p className="text-primary-muted">Sistem başarıyla yüklendi.</p>
+      </div>
+    </Layout>
+  );
+}
