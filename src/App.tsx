@@ -13,8 +13,9 @@ export default function Root() {
   const [view, setView] = useState<View>('dashboard');
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [email, setEmail] = useState('');
-  const [authLoading, setAuthLoading] = useState(false);
+    const [isSignUp, setIsSignUp] = useState(false);
+  const [password, setPassword] = useState('');
+  
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -28,19 +29,30 @@ export default function Root() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const handleLogin = async (e: React.FormEvent) => {
+    const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthLoading(true);
-    const { error } = await supabase.auth.signInWithOtp({ email });
-    setAuthLoading(false);
-    if (error) {
-      alert('Hata: ' + error.message);
+
+    if (isSignUp) {
+      const { error } = await supabase.auth.signUp({ email, password });
+      setAuthLoading(false);
+      if (error) {
+        alert('Kayıt Hatası: ' + error.message);
+      } else {
+        alert('Hesabınız oluşturuldu!');
+        setShowAuthModal(false);
+      }
     } else {
-      alert('Giriş bağlantısı e-postanıza gönderildi!');
-      setShowAuthModal(false);
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      setAuthLoading(false);
+      if (error) {
+        alert('Giriş Hatası: ' + error.message);
+      } else {
+        setShowAuthModal(false);
+      }
     }
   };
-
+  
   // --- SİTEYE İLK GİREN HERKESE GÖRÜNECEK AÇILIŞ / KARŞILAMA SAYFASI (LANDING PAGE) ---
   if (!session) {
     return (
@@ -56,10 +68,14 @@ export default function Root() {
               >
                 ✕
               </button>
-              <h3 className="text-2xl font-bold text-white mb-2">İadeNabız'a Giriş Yap</h3>
-              <p className="text-sm text-slate-400 mb-6">E-posta adresinizi girerek 7 günlük ücretsiz denemenizi başlatın.</p>
+                            <h3 className="text-2xl font-bold text-white mb-2">
+                {isSignUp ? "İadeNabız'a Kayıt Ol" : "İadeNabız'a Giriş Yap"}
+              </h3>
+              <p className="text-sm text-slate-400 mb-6">
+                {isSignUp ? '7 günlük ücretsiz denemenizi başlatmak için hesap oluşturun.' : 'Hesabınıza erişmek için e-posta ve şifrenizi girin.'}
+              </p>
               
-              <form onSubmit={handleLogin} className="space-y-4">
+              <form onSubmit={handleAuth} className="space-y-4">
                 <div>
                   <label className="text-xs font-semibold text-slate-300">E-Posta Adresiniz</label>
                   <input 
@@ -71,30 +87,57 @@ export default function Root() {
                     className="w-full mt-1 p-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-blue-500"
                   />
                 </div>
-                <button 
-                  type="submit" 
-                  disabled={authLoading}
-                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/25"
-                >
-                  {authLoading ? 'Gönderiliyor...' : 'Giriş Bağlantısı Gönder'}
-                </button>
-              </form>
-            </div>
-          </div>
-        )}
 
-        {/* NAVİGASYON HEADER */}
-        <nav className="border-b border-slate-800 bg-[#0f172a]/80 backdrop-blur-md sticky top-0 z-40 px-4 py-4">
-          <div className="max-w-6xl mx-auto flex justify-between items-center">
-            <div className="text-2xl font-black text-blue-500 tracking-tight">İadeNabız</div>
-            <div className="flex gap-3">
-              <button 
-                onClick={() => setShowAuthModal(true)}
+                <div>
+                  <label className="text-xs font-semibold text-slate-300">Şifreniz</label>
+                  <input 
+                    type="password" 
+                    required 
+                    minLength={6}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full mt-1 p-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                              <button 
+                onClick={() => { setIsSignUp(false); setShowAuthModal(true); }}
                 className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors"
               >
                 Giriş Yap
               </button>
               <button 
+                onClick={() => { setIsSignUp(true); setShowAuthModal(true); }}
+                className="px-4 py-2 text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all shadow-lg shadow-blue-500/20"
+              >
+                Ücretsiz Başla
+              </button>
+                
+                  onClick={() => setIsSignUp(!isSignUp)}
+                  className="text-xs text-blue-400 hover:underline"
+                >
+                  {isSignUp ? 'Zaten hesabınız var mı? Giriş yapın.' : 'Hesabınız yok mu? Ücretsiz kayıt olun.'}
+                </button>
+              </div>
+              
+            </div>
+          </div>
+        )}
+
+                    <button 
+              onClick={() => { setIsSignUp(true); setShowAuthModal(true); }} 
+              className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all shadow-xl shadow-blue-500/25 text-lg"
+            >
+              Ücretsiz Başla
+            </button>
+            <button 
+              onClick={() => { setIsSignUp(false); setShowAuthModal(true); }} 
+              className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl transition-all border border-slate-700 text-lg"
+            >
+              Giriş Yap
+            </button>
+        
                 onClick={() => setShowAuthModal(true)}
                 className="px-4 py-2 text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all shadow-lg shadow-blue-500/20"
               >
