@@ -630,43 +630,65 @@ export default function Root() {
     return <AuthPage />;
   }
 
-    return (
+      return (
     <Layout session={session} view={view} setView={setView}>
-      <div className="space-y-6">
-        {/* Özet Kartları */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="card">
-            <h3 className="text-sm font-medium text-primary-muted">Toplam İade Talebi</h3>
-            <p className="text-2xl font-bold text-primary-text mt-1">{claims.length}</p>
-          </div>
-          <div className="card">
-            <h3 className="text-sm font-medium text-primary-muted">Kullanıcı E-Posta</h3>
-            <p className="text-base font-medium text-primary-text mt-1 truncate">{session.user.email}</p>
-          </div>
-          <div className="card">
-            <h3 className="text-sm font-medium text-primary-muted">Sistem Durumu</h3>
-            <p className="text-base font-medium text-status-go mt-1">Aktif & Çalışıyor</p>
-          </div>
-        </div>
-
-        {/* Ana İçerik Kutusu */}
-        <div className="card">
-          <h2 className="text-xl font-bold text-primary-text mb-4">İadeNabız Yönetim Paneli</h2>
-          {claims.length === 0 ? (
-            <p className="text-primary-muted">Henüz kayıtlı bir iade talebi bulunmuyor.</p>
-          ) : (
-            <div className="space-y-2">
-              {claims.map((claim, index) => (
-                <div key={index} className="p-3 bg-primary-bg rounded-lg border border-gray-700 flex justify-between items-center">
-                  <span className="text-sm text-primary-text font-medium">{claim.title || 'İade Talebi'}</span>
-                  <span className="text-xs text-primary-muted">{claim.status || 'Beklemede'}</span>
-                </div>
-              ))}
+      {view === 'dashboard' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="card">
+              <h3 className="text-sm font-medium text-primary-muted">Toplam İade Talebi</h3>
+              <p className="text-2xl font-bold text-primary-text mt-1">{claims.length}</p>
             </div>
-          )}
+            <div className="card">
+              <h3 className="text-sm font-medium text-primary-muted">Kullanıcı E-Posta</h3>
+              <p className="text-base font-medium text-primary-text mt-1 truncate">{session.user.email}</p>
+            </div>
+            <div className="card">
+              <h3 className="text-sm font-medium text-primary-muted">Sistem Durumu</h3>
+              <p className="text-base font-medium text-status-go mt-1">Aktif & Çalışıyor</p>
+            </div>
+          </div>
+
+          <div className="card">
+            <h2 className="text-xl font-bold text-primary-text mb-4">İadeNabız Yönetim Paneli</h2>
+            {claims.length === 0 ? (
+              <p className="text-primary-muted">Henüz kayıtlı bir iade talebi bulunmuyor.</p>
+            ) : (
+              <div className="space-y-2">
+                {claims.map((claim, index) => (
+                  <div key={index} className="p-3 bg-primary-bg rounded-lg border border-gray-700 flex justify-between items-center">
+                    <span className="text-sm text-primary-text font-medium">{claim.title || 'İade Talebi'}</span>
+                    <span className="text-xs text-primary-muted">{claim.status || 'Beklemede'}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {view === 'products' && (
+        <div className="card">
+          <h2 className="text-xl font-bold text-primary-text mb-4">Ürünler & İadeler</h2>
+          <p className="text-primary-muted">Takip edilen ürün listeniz burada sergilenecektir.</p>
+        </div>
+      )}
+
+      {view === 'settings' && (
+        <div className="card">
+          <h2 className="text-xl font-bold text-primary-text mb-4">Hesap Ayarları</h2>
+          <p className="text-primary-muted">E-posta: {session.user.email}</p>
+        </div>
+      )}
+
+      {view === 'about' && (
+        <div className="card">
+          <h2 className="text-xl font-bold text-primary-text mb-4">Hakkında</h2>
+          <p className="text-primary-muted">İadeNabız v1.0 - Otomatik İade Takip Sistemi</p>
+        </div>
+      )}
     </Layout>
   );
-}
+              }
+
 
