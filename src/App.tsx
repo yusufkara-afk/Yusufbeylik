@@ -376,7 +376,8 @@ export default function Root() {
             <p>© 2026 İadeNabız. Tüm hakları saklıdır.</p>
           </div>
         </footer>
-    
+    </div>
+      </div>
   }
 
   // OTURUM AÇILDIĞINDA GÖRÜNECEK PANEL (KONTROL PANELİ)
