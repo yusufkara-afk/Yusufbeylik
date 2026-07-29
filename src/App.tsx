@@ -253,7 +253,7 @@ export default function Root() {
             </div>
           </div>
         </section>
-        {/* 5. FIYATLANDIRMA */}
+               {/* 5. FIYATLANDIRMA */}
         <section id="fiyatlandirma" className="px-4 py-20 max-w-4xl mx-auto text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white">Basit ve Şeffaf Fiyatlandırma</h2>
           <p className="text-slate-400 text-sm md:text-base max-w-2xl mx-auto mb-12">
@@ -288,13 +288,6 @@ export default function Root() {
           </div>
         </section>
         
-
-                {/* SIKÇA SORULAN SORULAR */}
-        <section id="sss" className="px-4 py-20 max-w-3xl mx-auto">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 text-white">
-            Sıkça Sorulan Sorular (SSS)
-          </h2>
-          <div className="space-y-4">
             {[
               {
                 q: "İadeNabız hangi pazaryerlerini destekliyor?",
