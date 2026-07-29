@@ -289,7 +289,7 @@ export default function Root() {
         </section>
         
             {[
-              {
+              
                 q: "İadeNabız hangi pazaryerlerini destekliyor?",
                 a: "İadeNabız; Trendyol, Hepsiburada, Çiçeksepeti, Amazon TR ve Shopify altyapılı kendi web sitenizle tam entegre çalışır."
               },
