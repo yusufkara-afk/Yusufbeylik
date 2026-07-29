@@ -60,7 +60,7 @@ export default function Root() {
       <div className="min-h-screen bg-[#0f172a] text-slate-100 font-sans selection:bg-blue-500 selection:text-white">
         
         {/* MODAL: GİRİŞ YAP / ÜCRETSİZ BAŞLA */}
-        {showAuthModal && (
+                {showAuthModal && (
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full shadow-2xl relative">
               <button 
@@ -69,14 +69,14 @@ export default function Root() {
               >
                 ✕
               </button>
-                            <h3 className="text-2xl font-bold text-white mb-2">
+              <h3 className="text-2xl font-bold text-white mb-2">
                 {isSignUp ? "İadeNabız'a Kayıt Ol" : "İadeNabız'a Giriş Yap"}
               </h3>
               <p className="text-sm text-slate-400 mb-6">
                 {isSignUp ? '7 günlük ücretsiz denemenizi başlatmak için hesap oluşturun.' : 'Hesabınıza erişmek için e-posta ve şifrenizi girin.'}
               </p>
               
-                            <form onSubmit={handleAuth} className="space-y-4">
+              <form onSubmit={handleAuth} className="space-y-4">
                 <div>
                   <label className="text-xs font-semibold text-slate-300">E-Posta Adresiniz</label>
                   <input 
@@ -119,11 +119,12 @@ export default function Root() {
                   {isSignUp ? 'Zaten hesabınız var mı? Giriş yapın.' : 'Hesabınız yok mu? Ücretsiz kayıt olun.'}
                 </button>
               </div>
-              
-              
             </div>
           </div>
         )}
+        
+
+  
 
                     <button 
               onClick={() => { setIsSignUp(true); setShowAuthModal(true); }} 
