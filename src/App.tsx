@@ -31,6 +31,7 @@ export default function Root() {
   }, []);
 
     const handleAuth = async (e: React.FormEvent) => {
+      
     e.preventDefault();
     setAuthLoading(true);
 
@@ -158,18 +159,20 @@ export default function Root() {
             İadelerin gerçek nedenlerini analiz edin, riskli ürünleri tespit edin ve günlük AI aksiyonlarıyla mağazanızın kârlılığını artırın.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button 
-              onClick={() => setShowAuthModal(true)} 
-              className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all shadow-xl shadow-blue-500/25 text-lg"
+                        <button 
+              onClick={() => { setIsSignUp(true); setShowAuthModal(true); }}
+              className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all shadow-xl shadow-blue-500/25"
             >
               Ücretsiz Başla
             </button>
-            <button 
-              onClick={() => setShowAuthModal(true)} 
-              className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl transition-all border border-slate-700 text-lg"
+            
+                        <button 
+              onClick={() => { setIsSignUp(false); setShowAuthModal(true); }}
+              className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl transition-all border border-slate-700"
             >
               Giriş Yap
             </button>
+            
           </div>
         </section>
 
