@@ -468,7 +468,7 @@ export default function Root() {
               </tbody>
             </table>
           </div>
-        </div>
+        
       </main>
     </div>
   );
