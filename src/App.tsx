@@ -360,7 +360,8 @@ export default function Root() {
                 <li><a href="mailto:destek@iadenabiz.com" className="hover:text-white transition-colors">E-posta</a></li>
               </ul>
             </div>
-          <div className="max-w-6xl mx-auto px-4 border-t border-slate-900 pt-6 text-center text-xs">
+         </div>
+            <div className="max-w-6xl mx-auto px-4 border-t border-slate-900 pt-6 text-center text-xs">
             <p>© 2026 İadeNabız. Tüm hakları saklıdır.</p>
           </div>
         </footer>
