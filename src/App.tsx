@@ -329,7 +329,6 @@ export default function Root() {
             ))}
           </div>
         </section>
-
         {/* FOOTER */}
         <footer className="border-t border-slate-800 py-12 bg-slate-950 text-slate-400 text-sm">
           <div className="max-w-6xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
@@ -371,10 +370,10 @@ export default function Root() {
             <p>© 2026 İadeNabız. Tüm hakları saklıdır.</p>
           </div>
         </footer>
-    </div>
       </div>
-  }
-
+    );
+}
+  
   // OTURUM AÇILDIĞINDA GÖRÜNECEK PANEL (KONTROL PANELİ)
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col">
