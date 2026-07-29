@@ -254,152 +254,135 @@ export default function Root() {
           </div>
         </section>
 
-        {/* 5. ÖDEME VE FİYATLANDIRMA BÖLÜMÜ */}
-        <section id="fiyatlandirma" className="px-4 py-20 max-w-6xl mx-auto">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Esnek ve Şeffaf Fiyatlandırma</h2>
-            <p className="text-slate-400">Mağazanızın ölçeğine uygun paketi seçin, iade maliyetlerinizi hemen düşürmeye başlayın.</p>
+        {/* 5. FIYATLANDIRMA */}
+        <section id="fiyatlandirma" className="px-4 py-20 max-w-4xl mx-auto text-center">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white">Basit ve Şeffaf Fiyatlandırma</h2>
+          <p className="text-slate-400 text-sm md:text-base max-w-2xl mx-auto mb-12">
+            Karmaşık paketler ve gizli ücretler yok. Tüm özelliklere tek fiyatla erişin.
+          </p>
+
+          <div className="max-w-md mx-auto bg-slate-900/90 border-2 border-blue-500 rounded-3xl p-8 relative shadow-2xl shadow-blue-500/10">
+            <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs font-bold px-4 py-1 rounded-full uppercase tracking-wider">
+              SINIRSIZ ERİŞİM
+            </span>
+            <h3 className="text-2xl font-bold text-white mb-2 mt-2">İadeNabız Pro</h3>
+            <div className="flex items-baseline justify-center gap-1 my-6">
+              <span className="text-5xl font-extrabold text-white">999₺</span>
+              <span className="text-slate-400 font-medium">/ Ay</span>
+            </div>
+
+            <ul className="text-left space-y-4 mb-8 text-sm text-slate-300">
+              <li className="flex items-center gap-3"><span className="text-emerald-400 font-bold">✓</span> AI Kök Neden Analizi</li>
+              <li className="flex items-center gap-3"><span className="text-emerald-400 font-bold">✓</span> AI Operasyon Merkezi</li>
+              <li className="flex items-center gap-3"><span className="text-emerald-400 font-bold">✓</span> Riskli Ürün Analizi</li>
+              <li className="flex items-center gap-3"><span className="text-emerald-400 font-bold">✓</span> İade Analizi</li>
+              <li className="flex items-center gap-3"><span className="text-emerald-400 font-bold">✓</span> Kâr Etki Analizi</li>
+              <li className="flex items-center gap-3"><span className="text-emerald-400 font-bold">✓</span> Haftalık AI Raporları</li>
+            </ul>
+
+            <button 
+              onClick={() => { setIsSignUp(true); setShowAuthModal(true); }}
+              className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/25"
+            >
+              Hemen Başla
+            </button>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Başlangıç Paketi */}
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 flex flex-col justify-between hover:border-slate-700 transition-all">
-              <div>
-                <h3 className="text-xl font-bold text-white mb-2">Başlangıç</h3>
-                <p className="text-slate-400 text-sm mb-6">Yeni başlayan e-ticaret mağazaları için.</p>
-                <div className="mb-6">
-                  <span className="text-4xl font-black text-white">₺499</span>
-                  <span className="text-slate-400 text-sm"> / ay</span>
-                </div>
-                <ul className="space-y-3 text-sm text-slate-300 mb-8">
-                  <li className="flex items-center gap-2">✓ 1.000 Sipariş/Ay Takibi</li>
-                  <li className="flex items-center gap-2">✓ Temel İade Analizi</li>
-                  <li className="flex items-center gap-2">✓ AI Kök Neden Analizi</li>
-                  <li className="flex items-center gap-2">✓ E-Posta Desteği</li>
-                </ul>
-              </div>
-              <button 
-                onClick={() => { setIsSignUp(true); setShowAuthModal(true); }}
-                className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-all border border-slate-700"
-              >
-                7 Gün Ücretsiz Deneyin
-              </button>
-            </div>
-
-            {/* Pro Paketi (Öne Çıkan) */}
-            <div className="bg-gradient-to-b from-blue-950/80 to-slate-900 border-2 border-blue-500 rounded-3xl p-8 flex flex-col justify-between relative shadow-2xl shadow-blue-500/10">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs font-bold px-4 py-1 rounded-full uppercase tracking-wider">
-                En Popüler
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-white mb-2">Pro</h3>
-                <p className="text-slate-400 text-sm mb-6">Büyümekte olan ve yüksek hacimli satıcılar için.</p>
-                <div className="mb-6">
-                  <span className="text-4xl font-black text-white">₺999</span>
-                  <span className="text-slate-400 text-sm"> / ay</span>
-                </div>
-                <ul className="space-y-3 text-sm text-slate-200 mb-8">
-                  <li className="flex items-center gap-2">✓ 10.000 Sipariş/Ay Takibi</li>
-                  <li className="flex items-center gap-2">✓ Gelişmiş AI Kök Neden Analizi</li>
-                  <li className="flex items-center gap-2">✓ Riskli Ürün Erken Uyarı Sistemi</li>
-                  <li className="flex items-center gap-2">✓ Günlük AI Aksiyon Tavsiyeleri</li>
-                  <li className="flex items-center gap-2">✓ Öncelikli Canlı Destek</li>
-                </ul>
-              </div>
-              <button 
-                onClick={() => { setIsSignUp(true); setShowAuthModal(true); }}
-                className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/25"
-              >
-                Pro Planı Başlat
-              </button>
-            </div>
-
-            {/* Kurumsal Paketi */}
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 flex flex-col justify-between hover:border-slate-700 transition-all">
-              <div>
-                <h3 className="text-xl font-bold text-white mb-2">Kurumsal</h3>
-                <p className="text-slate-400 text-sm mb-6">Çoklu mağaza ve büyük markalar için özel çözümler.</p>
-                <div className="mb-6">
-                  <span className="text-4xl font-black text-white">Özel</span>
-                </div>
-                <ul className="space-y-3 text-sm text-slate-300 mb-8">
-                  <li className="flex items-center gap-2">✓ Sınırsız Sipariş Takibi</li>
-                  <li className="flex items-center gap-2">✓ Özel API Entegrasyonları</li>
-                  <li className="flex items-center gap-2">✓ Çoklu Mağaza Yönetimi</li>
-                  <li className="flex items-center gap-2">✓ Müşteri Temsilcisi (7/24)</li>
-                </ul>
-              </div>
-              <button 
-                onClick={() => { setIsSignUp(true); setShowAuthModal(true); }}
-                className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl transition-all border border-slate-700"
-              >
+        </section>
+        
                 İletişime Geçin
               </button>
             </div>
           </div>
         </section>
 
-        {/* 6. SSS (SIKÇA SORULAN SORULAR) BÖLÜMÜ */}
-        <section id="sss" className="px-4 py-20 bg-slate-900/50 border-t border-slate-800">
-          <div className="max-w-4xl mx-auto">
-            <h2 className="text-3xl md:text-4xl font-bold text-center text-white mb-12">Sıkça Sorulan Sorular</h2>
-            <div className="space-y-4">
-              {[
-                {
-                  q: "İadeNabız mağazama nasıl entegre olur?",
-                  a: "Pazaryeri mağazanıza API anahtarları aracılığıyla sadece birkaç dakika içinde güvenle bağlanır. Herhangi bir kodlama bilgisine ihtiyacınız yoktur."
-                },
-                {
-                  q: "Ücretsiz deneme süresince kredi kartı gerekli mi?",
-                  a: "Hayır! 7 günlük ücretsiz denemenizi kart bilgisi girmeden anında başlatabilirsiniz."
-                },
-                {
-                  q: "AI kök neden analizi nasıl çalışır?",
-                  a: "İadeNabız yapay zekası, müşterilerin bıraktığı iade yorumlarını ve görselleri tarayarak problemin ürün açıklamasından mı, kalıptan mı yoksa kargodan mı kaynaklandığını tespit eder."
-                },
-                {
-                  q: "Verilerim güvende mi?",
-                  a: "Evet, tüm verileriniz Supabase ve yüksek güvenlikli uçtan uca şifrelemeli sunucularda saklanır. Verileriniz 3. şahıslarla asla  paylaşılamaz."
-                }
-              ].map((faq, idx) => (
-                <div key={idx} className="bg-slate-800/50 border border-slate-700/80 rounded-2xl overflow-hidden">
-                  <button 
-                    onClick={() => toggleFaq(idx)}
-                    className="w-full text-left p-5 flex justify-between items-center font-semibold text-white hover:bg-slate-800/80 transition-colors"
-                  >
-                    <span>{faq.q}</span>
-                    <span className="text-xl font-bold text-blue-400">{openFaq === idx ? '−' : '+'}</span>
-                  </button>
-                  {openFaq === idx && (
-                    <div className="p-5 pt-0 text-slate-400 text-sm leading-relaxed border-t border-slate-700/50">
-                      {faq.a}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
+                {/* SIKÇA SORULAN SORULAR */}
+        <section id="sss" className="px-4 py-20 max-w-3xl mx-auto">
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12 text-white">
+            Sıkça Sorulan Sorular (SSS)
+          </h2>
+          <div className="space-y-4">
+            {[
+              {
+                q: "İadeNabız hangi pazaryerlerini destekliyor?",
+                a: "İadeNabız; Trendyol, Hepsiburada, Çiçeksepeti, Amazon TR ve Shopify altyapılı kendi web sitenizle tam entegre çalışır."
+              },
+              {
+                q: "Ücretsiz deneme var mı?",
+                a: "Evet! Hesabınızı oluşturduktan sonra 7 gün boyunca hiçbir kredi kartı bilgisi vermeden tüm özellikleri ücretsiz deneyebilirsiniz."
+              },
+              {
+                q: "Verilerim güvende mi?",
+                a: "Tüm verileriniz uçtan uca şifrelenerek yüksek güvenlikli sunucularda saklanır. Verileriniz 3. şahıslarla asla paylaşılmaz."
+              },
+              {
+                q: "İadeNabız iadeleri otomatik yönetiyor mu?",
+                a: "İadeNabız size günlük ve haftalık aksiyon tavsiyeleri verir, iade nedenlerinin kök sebeplerini AI ile analiz eder. Kararları siz alırsınız, AI sürecinizi kolaylaştırır."
+              },
+              {
+                q: "Kimler için uygundur?",
+                a: "E-ticaret yapan, iade oranlarını düşürmek, kârlılığını artırmak ve iade nedenlerini detaylıca anlamak isteyen tüm satıcılar için uygundur."
+              }
+            ].map((faq, idx) => (
+              <div key={idx} className="bg-slate-800/50 border border-slate-700/80 rounded-2xl overflow-hidden">
+                <button 
+                  onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
+                  className="w-full text-left p-5 flex justify-between items-center font-semibold text-white hover:bg-slate-800/80 transition-colors"
+                >
+                  <span>{faq.q}</span>
+                  <span className="text-xl font-bold text-blue-400">{openFaq === idx ? '−' : '+'}</span>
+                </button>
+                {openFaq === idx && (
+                  <div className="p-5 pt-0 text-slate-400 text-sm leading-relaxed border-t border-slate-700/50">
+                    {faq.a}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </section>
 
         {/* FOOTER */}
         <footer className="border-t border-slate-800 py-12 bg-slate-950 text-slate-400 text-sm">
-          <div className="max-w-6xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white text-xs">
-                İ
-              </div>
-              <span className="font-bold text-lg text-white">İadeNabız</span>
+          <div className="max-w-6xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+            <div>
+              <h4 className="font-bold text-white mb-4">Ürün</h4>
+              <ul className="space-y-2 text-xs">
+                <li><a href="#" className="hover:text-white transition-colors">Ana Sayfa</a></li>
+                <li><a href="#ozellikler" className="hover:text-white transition-colors">Özellikler</a></li>
+                <li><a href="#fiyatlandirma" className="hover:text-white transition-colors">Fiyatlandırma</a></li>
+                <li><a href="#sss" className="hover:text-white transition-colors">SSS</a></li>
+              </ul>
             </div>
-            <p>© 2026 İadeNabız. Tüm hakları saklıdır.</p>
-            <div className="flex gap-6">
-              <a href="#ozellikler" className="hover:text-white transition-colors">Özellikler</a>
-              <a href="#fiyatlandirma" className="hover:text-white transition-colors">Fiyatlandırma</a>
-              <a href="#sss" className="hover:text-white transition-colors">SSS</a>
+            <div>
+              <h4 className="font-bold text-white mb-4">Şirket</h4>
+              <ul className="space-y-2 text-xs">
+                <li><a href="#" className="hover:text-white transition-colors">Hakkımızda</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">İletişim</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-bold text-white mb-4">Yasal</h4>
+              <ul className="space-y-2 text-xs">
+                <li><a href="#" className="hover:text-white transition-colors">Gizlilik Politikası</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Kullanım Şartları</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">KVKK</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">Çerez Politikası</a></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-bold text-white mb-4">İletişim</h4>
+              <ul className="space-y-2 text-xs">
+                <li><a href="#" className="hover:text-white transition-colors">LinkedIn</a></li>
+                <li><a href="mailto:destek@iadenabiz.com" className="hover:text-white transition-colors">E-posta</a></li>
+              </ul>
             </div>
           </div>
+          <div className="max-w-6xl mx-auto px-4 border-t border-slate-900 pt-6 text-center text-xs">
+            <p>© 2026 İadeNabız. Tüm hakları saklıdır.</p>
+          </div>
         </footer>
-      </div>
-    );
+    
   }
 
   // OTURUM AÇILDIĞINDA GÖRÜNECEK PANEL (KONTROL PANELİ)
