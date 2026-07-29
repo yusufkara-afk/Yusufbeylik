@@ -76,7 +76,7 @@ export default function Root() {
                 {isSignUp ? '7 günlük ücretsiz denemenizi başlatmak için hesap oluşturun.' : 'Hesabınıza erişmek için e-posta ve şifrenizi girin.'}
               </p>
               
-              <form onSubmit={handleAuth} className="space-y-4">
+                            <form onSubmit={handleAuth} className="space-y-4">
                 <div>
                   <label className="text-xs font-semibold text-slate-300">E-Posta Adresiniz</label>
                   <input 
@@ -102,25 +102,24 @@ export default function Root() {
                   />
                 </div>
 
-                              <button 
-                onClick={() => { setIsSignUp(false); setShowAuthModal(true); }}
-                className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors"
-              >
-                Giriş Yap
-              </button>
-              <button 
-                onClick={() => { setIsSignUp(true); setShowAuthModal(true); }}
-                className="px-4 py-2 text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all shadow-lg shadow-blue-500/20"
-              >
-                Ücretsiz Başla
-              </button>
-                
+                <button 
+                  type="submit" 
+                  disabled={authLoading}
+                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/25 mt-2"
+                >
+                  {authLoading ? 'İşleniyor...' : (isSignUp ? 'Ücretsiz Hesabımı Oluştur' : 'Giriş Yap')}
+                </button>
+              </form>
+
+              <div className="mt-4 text-center">
+                <button 
                   onClick={() => setIsSignUp(!isSignUp)}
                   className="text-xs text-blue-400 hover:underline"
                 >
                   {isSignUp ? 'Zaten hesabınız var mı? Giriş yapın.' : 'Hesabınız yok mu? Ücretsiz kayıt olun.'}
                 </button>
               </div>
+              
               
             </div>
           </div>
