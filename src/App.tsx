@@ -285,7 +285,6 @@ export default function Root() {
             >
               Hemen Başla
             </button>
-          </div>
         </section>
         
             {[
