@@ -283,11 +283,14 @@ export default function Root() {
               onClick={() => { setIsSignUp(true); setShowAuthModal(true); }}
               className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/25"
             >
-              Hemen Başla
-            </button>
-        </section>
-        
-            {[
+                        Hemen Başla
+        </button>
+      </div>
+    </section>
+
+    {[
+        {
+          
               
                 q: "İadeNabız hangi pazaryerlerini destekliyor?",
                 a: "İadeNabız; Trendyol, Hepsiburada, Çiçeksepeti, Amazon TR ve Shopify altyapılı kendi web sitenizle tam entegre çalışır."
