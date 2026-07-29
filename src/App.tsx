@@ -15,6 +15,7 @@ export default function Root() {
   const [showAuthModal, setShowAuthModal] = useState(false);
     const [isSignUp, setIsSignUp] = useState(false);
   const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
   
 
   useEffect(() => {
