@@ -1,694 +1,422 @@
-import { useState, useEffect, useCallback } from 'react';
-import type { Session } from '@supabase/supabase-js';
-import {
-  LayoutDashboard,
-  Package,
-  Settings,
-  User,
-  TrendingDown,
-  AlertTriangle,
-  CheckCircle,
-  Loader2,
-  PackageX,
-  ArrowUp,
-  ArrowDown,
-  ChevronLeft,
-  ChevronRight,
-  SlidersHorizontal,
-  Link2,
-  Unlink2,
-  Clock,
-  RefreshCw,
-  Crown,
-  Lock,
-  Calendar,
-  CreditCard,
-  Shield,
-  Heart,
-  Target,
-  Zap,
-  Lightbulb,
-  LinkIcon,
-} from 'lucide-react';
-import { supabase } from './lib/supabase';
-import type { Profile, Claim, ClaimReasonSummary, ProductClaimStats } from './lib/supabase';
-
-type View = 'dashboard' | 'products' | 'settings' | 'product-detail' | 'about' | 'payment-success' | 'payment-failed' | 'connect-trendyol' | 'erken-erisim';
-
-// ─── Recommendations based on reason patterns ─────────────────────────────────
-
-const RECOMMENDATIONS: Record<string, { title: string; description: string; stat: string }> = {
-  'Beden uyumsuzluğu': {
-    title: 'Beden Tablosu Ekleyin',
-    description: 'Ürün açıklamanıza detaylı beden tablosu ekleyin. "Bu ürün dar kalıptır, bir beden büyük almanızı öneririz" gibi bir uyarı iadeleri önemli ölçüde azaltabilir.',
-    stat: 'Bu adımı uygulayan satıcılar iade oranlarını ortalama %15-20 azalttı.',
-  },
-  'Kalite sorunu': {
-    title: 'Görselleri Güncelleyin',
-    description: 'Ürün fotoğraflarınızı güncelleyin, gerçek ürünü tüm açılardan gösteren detaylı görseller ekleyin. Açıklamada malzeme ve kalite detaylarına yer verin.',
-    stat: 'Gerçekçi görseller kullanmak müşteri memnuniyetini %25 artırır.',
-  },
-  'Renk uyuşmazlığı': {
-    title: 'Renk Bilgisi Netleştirin',
-    description: 'Ürün açıklamanızı güncelleyin. Renk bilgilerini netleştirin, farklı ışık koşullarında çekilmiş fotoğraflar ekleyin.',
-    stat: 'Detaylı renk açıklaması renk kaynaklı iadeleri %30 azaltır.',
-  },
-  'Hasarlı ürün': {
-    title: 'Paketlemeyi Güçlendirin',
-    description: 'Kargo paketlemenizi güçlendirin. Kırılgan ürünler için balonlu naylon ve sağlam kutu kullanımı iade oranını düşürür.',
-    stat: 'Güçlü paketleme hasar kaynaklı iadeleri %40 azaltır.',
-  },
-  'Diğer': {
-    title: 'Müşteri Geri Bildirimlerini Takip Edin',
-    description: 'İade nedenlerini daha iyi analiz etmek için müşteri yorumlarınızı düzenli takip edin. Ortak kalıpları tespit edin.',
-    stat: 'Düzenli analiz iade nedenlerini %20 daha hızlı tespit etmenizi sağlar.',
-  },
-};
-
-function getRecommendation(reason: string): { title: string; description: string; stat: string } {
-  return RECOMMENDATIONS[reason] || RECOMMENDATIONS['Diğer'];
-}
-
-// ─── Plan Helpers ────────────────────────────────────────────────────────────
-
-const PLAN_PRICES = {
-  monthly: { usd: 39, try: 1320, label: 'Aylık' },
-  yearly: { usd: 349, try: 11832, label: 'Yıllık' },
-};
-
-function getDaysRemaining(endDate: string): number {
-  const end = new Date(endDate);
-  const now = new Date();
-  const diff = end.getTime() - now.getTime();
-  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-}
-
-function isPlanActive(profile: Profile): boolean {
-  if (profile.plan_type === 'trial') {
-    return getDaysRemaining(profile.trial_ends_at) > 0;
-  }
-  if (profile.plan_type === 'monthly' || profile.plan_type === 'yearly') {
-    if (!profile.subscription_ends_at) return true;
-    return new Date(profile.subscription_ends_at) > new Date();
-  }
-  return false;
-}
-
-function getPlanStatus(profile: Profile): { label: string; daysLeft: number; isActive: boolean } {
-  const isActive = isPlanActive(profile);
-
-  if (profile.plan_type === 'trial') {
-    const daysLeft = getDaysRemaining(profile.trial_ends_at);
-    return { label: 'Deneme Sürümü', daysLeft, isActive: daysLeft > 0 };
-  }
-
-  if (profile.plan_type === 'monthly') {
-    const daysLeft = profile.subscription_ends_at
-      ? getDaysRemaining(profile.subscription_ends_at)
-      : 30;
-    return { label: 'Aylık Pro', daysLeft, isActive };
-  }
-
-  if (profile.plan_type === 'yearly') {
-    const daysLeft = profile.subscription_ends_at
-      ? getDaysRemaining(profile.subscription_ends_at)
-      : 365;
-    return { label: 'Yıllık Pro', daysLeft, isActive };
-  }
-
-  return { label: 'Süresi Dolmuş', daysLeft: 0, isActive: false };
-}
-
-// ─── Trendyol API Client ─────────────────────────────────────────────────────
-
-interface TrendyolStatus {
-  connected: boolean;
-  status?: string;
-  last_sync_at?: string;
-  error_message?: string;
-  seller_id?: string;
-  connected_at?: string;
-}
-
-async function getTrendyolStatus(): Promise<TrendyolStatus> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return { connected: false };
-
-  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/trendyol-sync/status`, {
-    headers: { Authorization: `Bearer ${session.access_token}` },
-  });
-
-  if (!response.ok) return { connected: false };
-  return response.json();
-}
-
-async function testTrendyolConnection(
-  sellerId: string,
-  apiKey: string,
-  apiSecret: string
-): Promise<{ success: boolean; message?: string; error?: string }> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return { success: false, error: 'Oturum bulunamadı' };
-
-  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/trendyol-sync/test-connection`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${session.access_token}`,
-    },
-    body: JSON.stringify({ seller_id: sellerId, api_key: apiKey, api_secret: apiSecret }),
-  });
-
-  return response.json();
-}
-
-async function syncTrendyolClaims(): Promise<{ success: boolean; message?: string; claimsProcessed?: number; error?: string }> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return { success: false, error: 'Oturum bulunamadı' };
-
-  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/trendyol-sync/sync-claims`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${session.access_token}` },
-  });
-
-  return response.json();
-}
-
-async function disconnectTrendyol(): Promise<void> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return;
-
-  await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/trendyol-sync/disconnect`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${session.access_token}` },
-  });
-}
-
-// ─── PayTR Payment ───────────────────────────────────────────────────────────
-
-async function createPaymentLink(
-  plan: 'monthly' | 'yearly'
-): Promise<{ success: boolean; payment_url?: string; error?: string }> {
-  // 1. Session kontrolü
-  let session;
-  try {
-    const sessionResult = await supabase.auth.getSession();
-    if (sessionResult.error) {
-      console.error('[createPaymentLink] getSession error:', sessionResult.error);
-      return { success: false, error: `Oturum bilgisi alınamadı: ${sessionResult.error.message}` };
-    }
-    session = sessionResult.data.session;
-  } catch (err) {
-    console.error('[createPaymentLink] getSession threw:', err);
-    return { success: false, error: 'Oturum bilgisi alınırken beklenmeyen bir hata oluştu' };
-  }
-
-  if (!session) {
-    return { success: false, error: 'Oturum bulunamadı, lütfen tekrar giriş yapın' };
-  }
-
-  // 2. Supabase URL'sinin build-time'da tanımlı olduğunu doğrula
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  if (!supabaseUrl) {
-    console.error('[createPaymentLink] VITE_SUPABASE_URL is not defined at build time');
-    return {
-      success: false,
-      error: 'Yapılandırma hatası: VITE_SUPABASE_URL tanımlı değil (deployment ortam değişkenlerini kontrol edin)',
-    };
-  }
-
-  const functionUrl = `${supabaseUrl}/functions/v1/paytr-payment`;
-
-  // 3. Fetch isteği — ağ hatası, CORS hatası burada yakalanır
-  let response: Response;
-  try {
-    response = await fetch(functionUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({ plan }),
-    });
-  } catch (err) {
-    console.error('[createPaymentLink] fetch threw (network/CORS):', err, 'URL:', functionUrl);
-    return {
-      success: false,
-      error: `Sunucuya ulaşılamadı (ağ/CORS hatası). URL: ${functionUrl} — Edge Function deploy edilmiş mi kontrol edin.`,
-    };
-  }
-
-  // 4. Ham response body'yi önce text olarak oku (JSON parse patlamasın diye)
-  let rawText: string;
-  try {
-    rawText = await response.text();
-  } catch (err) {
-    console.error('[createPaymentLink] response.text() threw:', err);
-    return { success: false, error: 'Sunucu yanıtı okunamadı' };
-  }
-
-  // 5. HTML dönüyorsa (yanlış URL / 404 sayfası / SPA fallback) net şekilde yakala
-  const looksLikeHtml = rawText.trim().startsWith('<');
-  if (looksLikeHtml) {
-    console.error(
-      '[createPaymentLink] Response is HTML, not JSON. Status:', response.status,
-      'URL:', functionUrl,
-      'Body (first 300 chars):', rawText.slice(0, 300)
-    );
-    return {
-      success: false,
-      error: `Sunucu JSON yerine HTML döndürdü (status ${response.status}). Bu genelde Edge Function'ın bu URL'de deploy edilmediği anlamına gelir: ${functionUrl}`,
-    };
-  }
-
-  // 6. JSON parse
-  let data: { success?: boolean; payment_url?: string; error?: string };
-  try {
-    data = JSON.parse(rawText);
-  } catch (err) {
-    console.error('[createPaymentLink] JSON.parse failed. Status:', response.status, 'Body:', rawText.slice(0, 300));
-    return {
-      success: false,
-      error: `Sunucu yanıtı geçerli JSON değil (status ${response.status}): ${rawText.slice(0, 150)}`,
-    };
-  }
-
-  // 7. HTTP status başarısızsa (400/401/404/500 vb.) ama JSON parse edilebildiyse
-  if (!response.ok) {
-    console.error('[createPaymentLink] Non-OK response:', response.status, data);
-    return {
-      success: false,
-      error: data.error || `Sunucu hatası (status ${response.status})`,
-    };
-  }
-
-  // 8. Başarılı ama beklenen alan eksikse
-  if (!data.success || !data.payment_url) {
-    console.error('[createPaymentLink] Response missing success/payment_url:', data);
-    return {
-      success: false,
-      error: data.error || 'Ödeme linki sunucudan alınamadı (payment_url eksik)',
-    };
-  }
-
-  return { success: true, payment_url: data.payment_url };
-}
-
-// ─── Auth Page ─────────────────────────────────────────────────────────────
-
-type AuthMode = 'login' | 'register';
-
-function AuthPage() {
-  const [mode, setMode] = useState<AuthMode>('login');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const isLogin = mode === 'login';
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    if (!isLogin && password !== confirmPassword) {
-      setError('Şifreler eşleşmiyor.');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Bir hata oluştu.';
-      if (msg.includes('Invalid login credentials')) {
-        setError('E-posta veya şifre hatalı.');
-      } else if (msg.includes('User already registered')) {
-        setError('Bu e-posta zaten kayıtlı. Giriş yapın.');
-      } else {
-        setError(msg);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-primary-bg px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-primary-text mb-2">
-            <span className="text-primary-cyan">İade</span>Nabız
-          </h1>
-          <p className="text-primary-muted">
-            {isLogin ? 'Hesabınıza giriş yapın' : 'Yeni hesap oluşturun'}
-          </p>
-        </div>
-
-        <div className="card">
-          <form className="space-y-4" onSubmit={handleSubmit}>
-            <div>
-              <label className="block text-sm font-medium text-primary-muted mb-2">E-posta</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="input-field"
-                placeholder="ornek@email.com"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-primary-muted mb-2">Şifre</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="input-field"
-                placeholder="********"
-                minLength={6}
-                required
-              />
-            </div>
-
-            {!isLogin && (
-              <div>
-                <label className="block text-sm font-medium text-primary-muted mb-2">Şifre Tekrar</label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="input-field"
-                  placeholder="********"
-                  minLength={6}
-                  required
-                />
-              </div>
-            )}
-
-            {error && (
-              <p className="text-sm text-status-stop bg-status-stop/10 border border-status-stop/20 rounded-lg px-3 py-2">
-                {error}
-              </p>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary mt-2 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              {isLogin ? 'Giriş Yap' : 'Kayıt Ol'}
-            </button>
-          </form>
-
-          {!isLogin && (
-            <p className="text-xs text-primary-muted text-center mt-4">
-              Kayıt olarak 7 gün ücretsiz deneme süresi kazanırsınız.
-            </p>
-          )}
-        </div>
-
-        <p className="text-center text-primary-muted mt-6">
-          {isLogin ? (
-            <>
-              Hesabın yok mu?{' '}
-              <button
-                onClick={() => { setMode('register'); setError(''); }}
-                className="text-primary-cyan hover:underline font-medium"
-              >
-                Kayıt ol
-              </button>
-            </>
-          ) : (
-            <>
-              Zaten hesabın var mı?{' '}
-              <button
-                onClick={() => { setMode('login'); setError(''); }}
-                className="text-primary-cyan hover:underline font-medium"
-              >
-                Giriş yap
-              </button>
-            </>
-          )}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// ─── Logo Component ─────────────────────────────────────────────────────────
-
-function Logo({ className = 'h-9' }: { className?: string }) {
-  return (
-    <span className={`font-bold text-primary-text ${className}`}>
-      <span className="text-primary-cyan">İade</span>Nabız
-    </span>
-  );
-}
-
-// ─── Shared Components ─────────────────────────────────────────────────────
-
-function Layout({
-  session,
-  view,
-  setView,
-  children,
-}: {
-  session: Session;
-  view: View;
-  setView: (v: View) => void;
-  children: React.ReactNode;
-}) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-  };
-
-  const navItems = [
-    { id: 'dashboard' as View, label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'products' as View, label: 'Ürünler', icon: Package },
-    { id: 'about' as View, label: 'Hakkımızda', icon: Heart },
-    { id: 'settings' as View, label: 'Ayarlar', icon: Settings },
-  ];
-
-  return (
-    <div className="min-h-screen bg-primary-bg flex">
-      <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-primary-card transform transition-transform duration-200 ease-in-out ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        }`}
-      >
-        <div className="flex items-center p-5 border-b border-gray-800">
-          <Logo />
-        </div>
-
-        <nav className="p-4 space-y-2">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => { setView(item.id); setSidebarOpen(false); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                view === item.id
-                  ? 'bg-primary-accent/10 text-primary-accent font-medium'
-                  : 'text-primary-muted hover:bg-primary-bg hover:text-primary-text'
-              }`}
-            >
-              <item.icon className="w-5 h-5" />
-              {item.label}
-            </button>
-          ))}
-        </nav>
-      </aside>
-
-      {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
-      )}
-
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-primary-card border-b border-gray-800 px-4 lg:px-6 py-4">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="lg:hidden p-2 text-primary-muted hover:text-primary-text"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-
-            <div className="lg:hidden flex items-center">
-              <Logo className="text-xl" />
-            </div>
-
-            <div className="hidden lg:flex items-center">
-              <span className="text-sm text-primary-muted">{session.user.email}</span>
-            </div>
-
-            {/* Profile Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-primary-bg transition-colors text-primary-muted hover:text-primary-text"
-              >
-                <User className="w-5 h-5" />
-                <span className="hidden sm:inline text-sm">Profil</span>
-              </button>
-
-              {profileDropdownOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setProfileDropdownOpen(false)}
-                  />
-                  <div className="absolute right-0 top-full mt-2 w-72 bg-primary-card border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
-                    <div className="p-4 border-b border-gray-700">
-                      <p className="text-xs text-primary-muted mb-1">E-posta</p>
-                      <p className="text-primary-text font-medium truncate">{session.user.email}</p>
-                    </div>
-                    <div className="p-4 border-b border-gray-700">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-primary-muted">Hesap Durumu</span>
-                        <span className="text-status-go text-sm flex items-center gap-1">
-                          <CheckCircle className="w-4 h-4" /> Aktif
-                                                  </span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleSignOut}
-                      className="w-full text-left px-4 py-3 text-sm text-status-stop hover:bg-status-stop/10 transition-colors border-t border-gray-700"
-                    >
-                      Çıkış Yap
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </header>
-
-        <main className="flex-1 p-4 lg:p-6 overflow-y-auto">
-          {children}
-        </main>
-      </div>
-    </div>
-  );
-}
+import React, { useState, useEffect } from 'react';
+import { createClient, Session } from '@supabase/supabase-js';
+
+// Supabase Bağlantısı
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+type View = 'dashboard' | 'products' | 'about' | 'settings';
 
 export default function Root() {
   const [session, setSession] = useState<Session | null>(null);
   const [view, setView] = useState<View>('dashboard');
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [claims, setClaims] = useState<Claim[]>([]);
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [email, setEmail] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
     });
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (session?.user) {
-      supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .maybeSingle()
-        .then(({ data }) => {
-          if (data) setProfile(data);
-        });
-
-      supabase
-        .from('claims')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .then(({ data }) => {
-          if (data) setClaims(data);
-        });
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthLoading(true);
+    const { error } = await supabase.auth.signInWithOtp({ email });
+    setAuthLoading(false);
+    if (error) {
+      alert('Hata: ' + error.message);
+    } else {
+      alert('Giriş bağlantısı e-postanıza gönderildi!');
+      setShowAuthModal(false);
     }
-  }, [session]);
+  };
 
+  // --- SİTEYE İLK GİREN HERKESE GÖRÜNECEK AÇILIŞ / KARŞILAMA SAYFASI (LANDING PAGE) ---
   if (!session) {
-    return <AuthPage />;
+    return (
+      <div className="min-h-screen bg-[#0f172a] text-slate-100 font-sans selection:bg-blue-500 selection:text-white">
+        
+        {/* MODAL: GİRİŞ YAP / ÜCRETSİZ BAŞLA */}
+        {showAuthModal && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full shadow-2xl relative">
+              <button 
+                onClick={() => setShowAuthModal(false)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-white text-xl font-bold"
+              >
+                ✕
+              </button>
+              <h3 className="text-2xl font-bold text-white mb-2">İadeNabız'a Giriş Yap</h3>
+              <p className="text-sm text-slate-400 mb-6">E-posta adresinizi girerek 7 günlük ücretsiz denemenizi başlatın.</p>
+              
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="text-xs font-semibold text-slate-300">E-Posta Adresiniz</label>
+                  <input 
+                    type="email" 
+                    required 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="ornek@magaza.com"
+                    className="w-full mt-1 p-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <button 
+                  type="submit" 
+                  disabled={authLoading}
+                  className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-500/25"
+                >
+                  {authLoading ? 'Gönderiliyor...' : 'Giriş Bağlantısı Gönder'}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* NAVİGASYON HEADER */}
+        <nav className="border-b border-slate-800 bg-[#0f172a]/80 backdrop-blur-md sticky top-0 z-40 px-4 py-4">
+          <div className="max-w-6xl mx-auto flex justify-between items-center">
+            <div className="text-2xl font-black text-blue-500 tracking-tight">İadeNabız</div>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setShowAuthModal(true)}
+                className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white transition-colors"
+              >
+                Giriş Yap
+              </button>
+              <button 
+                onClick={() => setShowAuthModal(true)}
+                className="px-4 py-2 text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all shadow-lg shadow-blue-500/20"
+              >
+                Ücretsiz Başla
+              </button>
+            </div>
+          </div>
+        </nav>
+
+        {/* 1. HERO BÖLÜMÜ */}
+        <section className="px-4 py-20 text-center max-w-4xl mx-auto">
+          <h1 className="text-4xl md:text-6xl font-black text-white tracking-tight mb-6 leading-tight">
+            Daha az iade, Daha az sorun, <br /><span className="text-blue-500">Daha fazla kâr.</span>
+          </h1>
+          <p className="text-lg md:text-xl text-slate-400 mb-8 leading-relaxed max-w-3xl mx-auto">
+            İadeNabız, e-ticaret satıcıları için geliştirilen yapay zekâ destekli operasyon platformudur. 
+            İadelerin gerçek nedenlerini analiz edin, riskli ürünleri tespit edin ve günlük AI aksiyonlarıyla mağazanızın kârlılığını artırın.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <button 
+              onClick={() => setShowAuthModal(true)} 
+              className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all shadow-xl shadow-blue-500/25 text-lg"
+            >
+              Ücretsiz Başla
+            </button>
+            <button 
+              onClick={() => setShowAuthModal(true)} 
+              className="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl transition-all border border-slate-700 text-lg"
+            >
+              Giriş Yap
+            </button>
+          </div>
+        </section>
+
+        {/* 2. İSTATİSTİK BÖLÜMÜ */}
+        <section className="px-4 py-16 bg-slate-900/50 border-y border-slate-800">
+          <div className="max-w-6xl mx-auto">
+            <h2 className="text-2xl md:text-3xl font-bold text-center mb-12 text-white">Verilerle Yönetin, Tahminlerle Değil.</h2>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="p-6 bg-slate-800/40 rounded-2xl border border-slate-700/80 text-center">
+                <div className="text-3xl mb-2">📦</div>
+                <h3 className="font-bold text-lg text-white">İade Analizi</h3>
+              </div>
+              <div className="p-6 bg-slate-800/40 rounded-2xl border border-slate-700/80 text-center">
+                <div className="text-3xl mb-2">🤖</div>
+                <h3 className="font-bold text-lg text-white">AI Destekli Kararlar</h3>
+              </div>
+              <div className="p-6 bg-slate-800/40 rounded-2xl border border-slate-700/80 text-center">
+                <div className="text-3xl mb-2">💰</div>
+                <h3 className="font-bold text-lg text-white">Kârlılık Takibi</h3>
+              </div>
+              <div className="p-6 bg-slate-800/40 rounded-2xl border border-slate-700/80 text-center">
+                <div className="text-3xl mb-2">⚡</div>
+                <h3 className="font-bold text-lg text-white">Günlük Operasyon Merkezi</h3>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 3. NEDEN İADENABIZ? */}
+        <section className="px-4 py-20 max-w-4xl mx-auto text-center">
+          <h2 className="text-3xl md:text-4xl font-bold mb-6 text-white">İade Oranını Görmek Yetmez. Sebebini Bilmek Gerekir.</h2>
+          <p className="text-slate-300 text-lg leading-relaxed bg-slate-800/30 p-8 rounded-2xl border border-slate-700/60 shadow-inner">
+            Birçok satıcı yalnızca kaç ürünün iade edildiğini görür. İadeNabız ise bu iadelerin neden gerçekleştiğini analiz eder, en riskli ürünleri belirler ve yapay zekâ destekli aksiyonlarla mağazanızın daha kârlı çalışmasına yardımcı olur.
+          </p>
+        </section>
+
+        {/* 4. ÖZELLİKLER */}
+        <section className="px-4 py-16 bg-slate-900/50 border-t border-slate-800">
+          <div className="max-w-6xl mx-auto">
+            <h2 className="text-3xl font-bold text-center mb-12 text-white">İhtiyacınız Olan Tüm Operasyon Araçları Tek Platformda</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="p-6 bg-slate-800/40 rounded-2xl border border-slate-700/70">
+                <h3 className="text-xl font-bold mb-2 text-white">🤖 AI Kök Neden Analizi</h3>
+                <p className="text-slate-400 text-sm leading-relaxed">İadelerin gerçek sebeplerini yorumlar ve veriler üzerinden analiz eder.</p>
+              </div>
+              <div className="p-6 bg-slate-800/40 rounded-2xl border border-slate-700/70">
+                <h3 className="text-xl font-bold mb-2 text-white">⚠️ Riskli Ürün Analizi</h3>
+                <p className="text-slate-400 text-sm leading-relaxed">Kârlılığı düşüren ürünleri tespit ederek erken aksiyon almanızı sağlar.</p>
+              </div>
+              <div className="p-6 bg-slate-800/40 rounded-2xl border border-slate-700/70">
+                <h3 className="text-xl font-bold mb-2 text-white">💰 Kâr Etki Analizi</h3>
+                <p className="text-slate-400 text-sm leading-relaxed">İadelerin mağazanıza olan finansal etkisini TL bazında gösterir.</p>
+              </div>
+              <div className="p-6 bg-slate-800/40 rounded-2xl border border-slate-700/70">
+                <h3 className="text-xl font-bold mb-2 text-white">📊 İade Analizi</h3>
+                <p className="text-slate-400 text-sm leading-relaxed">Ürün bazında tüm iade verilerini tek panelden takip edin.</p>
+              </div>
+              <div className="p-6 bg-slate-800/40 rounded-2xl border border-slate-700/70">
+                <h3 className="text-xl font-bold mb-2 text-white">🚦 Durdur • İzle • Devam et</h3>
+                <p className="text-slate-400 text-sm leading-relaxed">AI hangi ürünün durdurulması, takip edilmesi veya devam ettirilmesi gerektiğini önerir.</p>
+              </div>
+              <div className="p-6 bg-slate-800/40 rounded-2xl border border-slate-700/70">
+                <h3 className="text-xl font-bold mb-2 text-white">📅 Günlük AI Operasyon Merkezi</h3>
+                <p className="text-slate-400 text-sm leading-relaxed">Her gün yapılması gereken en önemli aksiyonları tek ekranda görün.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 5. NASIL ÇALIŞIR? */}
+        <section className="px-4 py-20 max-w-5xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-12 text-white">3 Adımda Başlayın</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+            <div className="p-6 bg-slate-800/20 rounded-2xl border border-slate-800">
+              <div className="w-12 h-12 bg-blue-600 text-white font-black text-xl rounded-full flex items-center justify-center mx-auto mb-4">1</div>
+              <h3 className="font-bold text-lg text-white">Mağazanızı bağlayın.</h3>
+            </div>
+            <div className="p-6 bg-slate-800/20 rounded-2xl border border-slate-800">
+              <div className="w-12 h-12 bg-blue-600 text-white font-black text-xl rounded-full flex items-center justify-center mx-auto mb-4">2</div>
+              <h3 className="font-bold text-lg text-white">Yapay zekâ tüm iadeleri analiz etsin.</h3>
+            </div>
+            <div className="p-6 bg-slate-800/20 rounded-2xl border border-slate-800">
+              <div className="w-12 h-12 bg-blue-600 text-white font-black text-xl rounded-full flex items-center justify-center mx-auto mb-4">3</div>
+              <h3 className="font-bold text-lg text-white">Günlük önerileri uygulayın ve kârlılığınızı artırın.</h3>
+            </div>
+          </div>
+        </section>
+
+        {/* 6. DASHBOARD ÖNİZLEME */}
+        <section className="px-4 py-16 bg-slate-900/50 border-t border-slate-800 text-center">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-3xl font-bold mb-2 text-white">Tüm Operasyonlarınızı Tek Panelden Yönetin</h2>
+            <p className="text-slate-400 mb-8">Kârlılık, iade analizi, AI önerileri ve riskli ürünler tek ekranda.</p>
+            <div className="p-6 md:p-8 bg-slate-800/90 rounded-3xl border border-slate-700 shadow-2xl text-left space-y-4">
+              <div className="flex justify-between items-center border-b border-slate-700 pb-4">
+                <span className="font-bold text-lg text-blue-400">İadeNabız Pro Önizleme</span>
+                <span className="text-xs bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full border border-emerald-500/30">● Canlı Veri</span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-2">
+                <div className="p-3 bg-slate-900/80 rounded-xl">
+                  <span className="text-xs text-slate-400">İade Oranı</span>
+                  <p className="text-xl font-bold text-white">%3.2</p>
+                </div>
+                <div className="p-3 bg-slate-900/80 rounded-xl">
+                  <span className="text-xs text-slate-400">Tasarruf Etkisi</span>
+                  <p className="text-xl font-bold text-emerald-400">₺14,250</p>
+                </div>
+                <div className="p-3 bg-slate-900/80 rounded-xl">
+                  <span className="text-xs text-slate-400">Riskli Ürünler</span>
+                  <p className="text-xl font-bold text-amber-400">2 Ürün</p>
+                </div>
+                <div className="p-3 bg-slate-900/80 rounded-xl">
+                  <span className="text-xs text-slate-400">AI Aksiyonu</span>
+                  <p className="text-xl font-bold text-purple-400">Hazır</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 7. FİYATLANDIRMA */}
+        <section className="px-4 py-20 max-w-4xl mx-auto text-center">
+          <h2 className="text-3xl font-bold mb-12 text-white">Basit ve Şeffaf Fiyatlandırma</h2>
+          <div className="max-w-md mx-auto p-8 bg-slate-800/80 rounded-3xl border-2 border-blue-500 shadow-2xl relative">
+            <span className="absolute -top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs font-bold px-4 py-1 rounded-full uppercase tracking-wide">Sınırsız Erişim</span>
+            <h3 className="text-2xl font-bold mb-2 text-white">İadeNabız Pro</h3>
+            <div className="text-4xl font-extrabold my-4 text-white">999₺ <span className="text-base font-normal text-slate-400">/ Ay</span></div>
+            <ul className="text-left space-y-3 mb-8 text-slate-300 text-sm">
+              <li className="flex items-center gap-2"><span className="text-emerald-400 font-bold">✓</span> 7 Gün Ücretsiz Deneme</li>
+              <li className="flex items-center gap-2"><span className="text-emerald-400 font-bold">✓</span> AI Kök Neden Analizi</li>
+              <li className="flex items-center gap-2"><span className="text-emerald-400 font-bold">✓</span> AI Operasyon Merkezi</li>
+              <li className="flex items-center gap-2"><span className="text-emerald-400 font-bold">✓</span> Riskli Ürün Analizi</li>
+              <li className="flex items-center gap-2"><span className="text-emerald-400 font-bold">✓</span> İade Analizi</li>
+              <li className="flex items-center gap-2"><span className="text-emerald-400 font-bold">✓</span> Kâr Etki Analizi</li>
+              <li className="flex items-center gap-2"><span className="text-emerald-400 font-bold">✓</span> Haftalık AI Raporları</li>
+            </ul>
+            <button 
+              onClick={() => setShowAuthModal(true)} 
+              className="w-full py-4 bg-blue-600 hover:bg-blue-500 font-bold text-white rounded-xl transition-all shadow-lg shadow-blue-500/20"
+            >
+              Hemen Başla
+            </button>
+          </div>
+        </section>
+
+        {/* 8. SSS */}
+        <section className="px-4 py-16 bg-slate-900/50 border-t border-slate-800">
+          <div className="max-w-3xl mx-auto">
+            <h2 className="text-3xl font-bold text-center mb-10 text-white">Sıkça Sorulan Sorular (SSS)</h2>
+            <div className="space-y-4">
+              {[
+                { q: 'İadeNabız hangi pazaryerlerini destekliyor?', a: 'Şu anda Trendyol ve Shopify pazaryerlerini destekliyor.' },
+                { q: 'Ücretsiz deneme var mı?', a: 'Evet. Kayıt olan her kullanıcı otomatik olarak 7 günlük ücretsiz deneme hakkı kazanır.' },
+                { q: 'Verilerim güvende mi?', a: 'Evet. Verileriniz güvenli şekilde saklanır ve üçüncü kişilerle paylaşılmaz.' },
+                { q: 'İadeNabız iadeleri otomatik yönetiyor mu?', a: 'Hayır. İadeNabız\'ın amacı iadeleri yönetmek değil, iadelerin nedenlerini analiz ederek daha az iade almanıza yardımcı olmaktır.' },
+                { q: 'Kimler için uygundur?', a: 'Trendyol ve Shopify üzerinden satış yapan, mağazasını veri odaklı yönetmek isteyen e-ticaret satıcıları için geliştirilmiştir.' }
+              ].map((faq, idx) => (
+                <div key={idx} className="bg-slate-800/40 border border-slate-700/60 rounded-xl overflow-hidden">
+                  <button 
+                    onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
+                    className="w-full p-4 text-left font-semibold flex justify-between items-center text-slate-200"
+                  >
+                    <span>{faq.q}</span>
+                    <span className="text-blue-400 text-lg">{openFaq === idx ? '−' : '+'}</span>
+                  </button>
+                  {openFaq === idx && (
+                    <div className="p-4 pt-0 text-slate-400 text-sm border-t border-slate-700/30">
+                      {faq.a}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* 9. FOOTER */}
+        <footer className="border-t border-slate-800 bg-slate-950 px-4 py-12 text-slate-400 text-sm">
+          <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
+            <div>
+              <h4 className="font-bold text-white mb-3">Ürün</h4>
+              <ul className="space-y-2 text-xs">
+                <li>Ana Sayfa</li>
+                <li>Özellikler</li>
+                <li>Fiyatlandırma</li>
+                <li>SSS</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-bold text-white mb-3">Şirket</h4>
+              <ul className="space-y-2 text-xs">
+                <li>Hakkımızda</li>
+                <li>İletişim</li>
+                <li>Blog</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-bold text-white mb-3">Yasal</h4>
+              <ul className="space-y-2 text-xs">
+                <li>Gizlilik Politikası</li>
+                <li>Kullanım Şartları</li>
+                <li>KVKK</li>
+                <li>Çerez Politikası</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-bold text-white mb-3">İletişim</h4>
+              <ul className="space-y-2 text-xs">
+                <li>LinkedIn</li>
+                <li>E-posta</li>
+              </ul>
+            </div>
+          </div>
+          <div className="text-center pt-8 border-t border-slate-900 text-xs text-slate-500">
+            © 2026 İadeNabız. Tüm hakları saklıdır.
+          </div>
+        </footer>
+      </div>
+    );
   }
 
-      return (
-    <Layout session={session} view={view} setView={setView}>
-      {view === 'dashboard' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="card">
-              <h3 className="text-sm font-medium text-primary-muted">Toplam İade Talebi</h3>
-              <p className="text-2xl font-bold text-primary-text mt-1">{claims.length}</p>
-            </div>
-            <div className="card">
-              <h3 className="text-sm font-medium text-primary-muted">Kullanıcı E-Posta</h3>
-              <p className="text-base font-medium text-primary-text mt-1 truncate">{session.user.email}</p>
-            </div>
-            <div className="card">
-              <h3 className="text-sm font-medium text-primary-muted">Sistem Durumu</h3>
-              <p className="text-base font-medium text-status-go mt-1">Aktif & Çalışıyor</p>
-            </div>
-          </div>
+    // --- KULLANICI GİRİŞ YAPTIYSA GÖRÜNECEK YÖNETİM PANELİ ---
+  return (
+    <div className="min-h-screen bg-[#0f172a] text-slate-100 flex flex-col font-sans">
+      <header className="border-b border-slate-800 bg-slate-900/80 px-4 py-3 flex justify-between items-center">
+        <span className="font-black text-xl text-blue-500">İadeNabız Panel</span>
+        <div className="flex items-center gap-3 text-xs">
+          <span className="text-slate-400 truncate max-w-[150px]">{session.user.email}</span>
+          <button 
+            onClick={() => supabase.auth.signOut()}
+            className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700 font-medium"
+          >
+            Çıkış Yap
+          </button>
+        </div>
+      </header>
 
-          <div className="card">
-            <h2 className="text-xl font-bold text-primary-text mb-4">İadeNabız Yönetim Paneli</h2>
-            {claims.length === 0 ? (
-              <p className="text-primary-muted">Henüz kayıtlı bir iade talebi bulunmuyor.</p>
-            ) : (
-              <div className="space-y-2">
-                {claims.map((claim, index) => (
-                  <div key={index} className="p-3 bg-primary-bg rounded-lg border border-gray-700 flex justify-between items-center">
-                    <span className="text-sm text-primary-text font-medium">{claim.title || 'İade Talebi'}</span>
-                    <span className="text-xs text-primary-muted">{claim.status || 'Beklemede'}</span>
-                  </div>
-                ))}
+      <div className="flex flex-1">
+        {/* Sol Menü */}
+        <aside className="w-64 bg-slate-900/50 border-r border-slate-800 p-4 space-y-1 hidden md:block">
+          <button onClick={() => setView('dashboard')} className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold ${view === 'dashboard' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>📊 Dashboard</button>
+          <button onClick={() => setView('products')} className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold ${view === 'products' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>📦 Ürünler & İadeler</button>
+          <button onClick={() => setView('about')} className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold ${view === 'about' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>❓ SSS & Destek</button>
+          <button onClick={() => setView('settings')} className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-semibold ${view === 'settings' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-800'}`}>⚙️ Ayarlar</button>
+        </aside>
+
+        {/* Ana İçerik */}
+        <main className="flex-1 p-6">
+          {view === 'dashboard' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-5 bg-slate-800/40 rounded-2xl border border-slate-700">
+                  <span className="text-xs text-slate-400 font-semibold uppercase">Toplam İade</span>
+                  <p className="text-3xl font-extrabold text-white mt-1">0</p>
+                </div>
+                <div className="p-5 bg-slate-800/40 rounded-2xl border border-slate-700">
+                  <span className="text-xs text-slate-400 font-semibold uppercase">AI Durumu</span>
+                  <p className="text-sm font-medium text-emerald-400 mt-2">● Aktif ve Çalışıyor</p>
+                </div>
+                <div className="p-5 bg-slate-800/40 rounded-2xl border border-slate-700">
+                  <span className="text-xs text-slate-400 font-semibold uppercase">Paket</span>
+                  <p className="text-sm font-medium text-blue-400 mt-2">7 Gün Ücretsiz Deneme</p>
+                </div>
               </div>
-            )}
-          </div>
-        </div>
-      )}
+            </div>
+          )}
 
-      {view === 'products' && (
-        <div className="card">
-          <h2 className="text-xl font-bold text-primary-text mb-4">Ürünler & İadeler</h2>
-          <p className="text-primary-muted">Takip edilen ürün listeniz burada sergilenecektir.</p>
-        </div>
-      )}
+          {view === 'products' && (
+            <div className="p-6 bg-slate-800/40 rounded-2xl border border-slate-700">
+              <h2 className="text-xl font-bold mb-2">Ürünler & İadeler</h2>
+              <p className="text-slate-400 text-sm">Takip edilen iade talepleriniz burada sergilenecektir.</p>
+            </div>
+          )}
 
-      {view === 'settings' && (
-        <div className="card">
-          <h2 className="text-xl font-bold text-primary-text mb-4">Hesap Ayarları</h2>
-          <p className="text-primary-muted">E-posta: {session.user.email}</p>
-        </div>
-      )}
+          {view === 'about' && (
+            <div className="p-6 bg-slate-800/40 rounded-2xl border border-slate-700">
+              <h2 className="text-xl font-bold mb-2">Sıkça Sorulan Sorular</h2>
+              <p className="text-slate-400 text-sm">Destek ekibimizle iletişime geçebilirsiniz.</p>
+            </div>
+          )}
 
-      {view === 'about' && (
-        <div className="card">
-          <h2 className="text-xl font-bold text-primary-text mb-4">Hakkında</h2>
-          <p className="text-primary-muted">İadeNabız v1.0 - Otomatik İade Takip Sistemi</p>
-        </div>
-      )}
-    </Layout>
+          {view === 'settings' && (
+            <div className="p-6 bg-slate-800/40 rounded-2xl border border-slate-700">
+              <h2 className="text-xl font-bold mb-2">Ayarlar</h2>
+              <p className="text-slate-400 text-sm">Hesap: {session.user.email}</p>
+            </div>
+          )}
+        </main>
+      </div>
+    </div>
   );
-              }
+}
 
 
