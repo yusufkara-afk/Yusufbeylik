@@ -607,12 +607,19 @@ export default function Root() {
     return <AuthPage />;
   }
 
- return (
-  <Layout session={session} view={view} setView={setView}>
-    {view === 'dashboard' && <DashboardView profile={profile} claims={claims} />}
-    {view === 'products' && <ProductsView claims={claims} setView={setView} />}
-    {view === 'settings' && <SettingsView profile={profile} />}
-    {view === 'about' && <AboutView />}
-  </Layout>
-);
+   if (!session) {
+    return <AuthPage />;
+  }
+
+  return (
+    <Layout session={session} view={view} setView={setView}>
+      <div className="space-y-6">
+        <div className="card">
+          <h2 className="text-xl font-bold text-primary-text mb-2">İadeNabız Panel</h2>
+          <p className="text-primary-muted">Giriş yapıldı: {session.user.email}</p>
+        </div>
+      </div>
+    </Layout>
+  );
+  
 }  
