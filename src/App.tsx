@@ -607,12 +607,12 @@ export default function Root() {
     return <AuthPage />;
   }
 
-  return (
-    <Layout session={session} view={view} setView={setView}>
-      <div className="card">
-        <h2 className="text-xl font-bold mb-4">Dashboard</h2>
-        <p className="text-primary-muted">Sistem başarıyla yüklendi.</p>
-      </div>
-    </Layout>
-  );
-}
+ return (
+  <Layout session={session} view={view} setView={setView}>
+    {view === 'dashboard' && <DashboardView profile={profile} claims={claims} />}
+    {view === 'products' && <ProductsView claims={claims} setView={setView} />}
+    {view === 'settings' && <SettingsView profile={profile} />}
+    {view === 'about' && <AboutView />}
+  </Layout>
+);
+ 
