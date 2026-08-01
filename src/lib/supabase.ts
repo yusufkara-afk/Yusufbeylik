@@ -1,12 +1,50 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string) || '';
-const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || '';
+// Safe environment variable access with fallbacks
+const getEnvVar = (key: string, fallback: string): string => {
+  try {
+    const value = (import.meta.env as Record<string, string | undefined>)[key];
+    if (value && typeof value === 'string' && value.length > 0) {
+      return value;
+    }
+    console.warn(`[Supabase] Environment variable ${key} not set, using fallback`);
+    return fallback;
+  } catch (error) {
+    console.error(`[Supabase] Error reading ${key}:`, error);
+    return fallback;
+  }
+};
 
-export const supabase = createClient(
-  supabaseUrl || 'https://ytguuqnefjkwyirjmbks.supabase.co',
-  supabaseAnonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0Z3V1cW5lZmprd3lpcmptYmtzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MTE5NDYsImV4cCI6MjA5NzI4Nzk0Nn0.0vBOVpcECeo92GtHM4Lh1MmROgbUBGGwQDapdKPYbRI'
-);
+// Fallback values for production
+const FALLBACK_URL = 'https://ytguuqnefjkwyirjmbks.supabase.co';
+const FALLBACK_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0Z3V1cW5lZmprd3lpcmptYmtzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MTE5NDYsImV4cCI6MjA5NzI4Nzk0Nn0.0vBOVpcECeo92GtHM4Lh1MmROgbUBGGwQDapdKPYbRI';
+
+const supabaseUrl = getEnvVar('VITE_SUPABASE_URL', FALLBACK_URL);
+const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY', FALLBACK_KEY);
+
+// Track initialization error
+let initializationError: string | null = null;
+let supabaseClient: SupabaseClient | null = null;
+
+try {
+  console.log('[Supabase] Initializing client...');
+  supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+  console.log('[Supabase] Client initialized successfully');
+} catch (error) {
+  initializationError = error instanceof Error ? error.message : 'Failed to initialize Supabase client';
+  console.error('[Supabase] Initialization failed:', initializationError);
+  // Create a dummy client that won't crash the app
+  try {
+    supabaseClient = createClient(FALLBACK_URL, FALLBACK_KEY);
+  } catch {
+    // Last resort - this should never fail with hardcoded values
+    console.error('[Supabase] Critical: Fallback client creation failed');
+  }
+}
+
+export const supabase = supabaseClient!;
+export const getSupabaseError = () => initializationError;
+export const isSupabaseInitialized = () => supabaseClient !== null && initializationError === null;
 
 export type ProductStatus = 'stop' | 'watch' | 'go';
 
